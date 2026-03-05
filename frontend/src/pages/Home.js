@@ -1,8 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaCouch, FaTruck, FaTools, FaShieldAlt } from 'react-icons/fa';
+import { FaCouch, FaTruck, FaTools, FaShieldAlt, FaBox, FaClipboardList } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
+import { ordersAPI } from '../services/api';
 
 const Home = () => {
+  const { user, isAuthenticated, isCustomer } = useAuth();
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && isCustomer) {
+      fetchRecentOrders();
+    }
+  }, [isAuthenticated, isCustomer]);
+
+  const fetchRecentOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const response = await ordersAPI.getAll();
+      // Get only the 3 most recent orders
+      setRecentOrders(response.data.slice(0, 3));
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      in_production: 'bg-purple-100 text-purple-800',
+      ready: 'bg-green-100 text-green-800',
+      out_for_delivery: 'bg-indigo-100 text-indigo-800',
+      delivered: 'bg-green-600 text-white',
+      cancelled: 'bg-red-100 text-red-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
   return (
     <div>
       {/* Hero Section */}
@@ -67,6 +105,70 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {/* My Orders Section - Only for logged-in customers */}
+      {isAuthenticated && isCustomer && (
+        <section className="py-16 bg-white border-b">
+          <div className="container-custom">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-3">
+                <FaClipboardList className="text-primary-600 text-3xl" />
+                <h2 className="text-3xl font-bold">My Orders</h2>
+              </div>
+              <Link 
+                to="/customerdashboard" 
+                className="text-primary-600 hover:text-primary-800 font-semibold flex items-center gap-2"
+              >
+                View All Orders →
+              </Link>
+            </div>
+            
+            {loadingOrders ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading your orders...</p>
+              </div>
+            ) : recentOrders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {recentOrders.map((order) => (
+                  <div key={order._id} className="bg-gray-50 rounded-xl p-5 border-2 border-gray-200 hover:border-primary-300 hover:shadow-lg transition-all">
+                    <div className="flex justify-between items-start mb-3">
+                      <p className="font-bold text-gray-900">
+                        Order #{order.orderNumber || order._id.slice(-6).toUpperCase()}
+                      </p>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
+                        {order.status.replace(/_/g, ' ').toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      📅 {new Date(order.createdAt).toLocaleDateString()}
+                    </p>
+                    <div className="flex items-center gap-2 mb-3">
+                      <FaBox className="text-gray-400" />
+                      <span className="text-sm text-gray-600">{order.items?.length || 0} item(s)</span>
+                      <span className="text-lg font-bold text-green-600 ml-auto">${order.totalAmount}</span>
+                    </div>
+                    <Link 
+                      to={`/orders/${order._id}`}
+                      className="block w-full text-center px-4 py-2 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition"
+                    >
+                      Track Order
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-xl">
+                <div className="text-6xl mb-4">📦</div>
+                <p className="text-gray-500 text-lg mb-4">You haven't placed any orders yet</p>
+                <Link to="/catalogue" className="inline-block px-8 py-3 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition">
+                  Start Shopping
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Categories */}
       <section className="py-16 bg-gray-50">
