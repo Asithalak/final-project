@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ordersAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const CustomerDashboard = () => {
   const [userRole, setUserRole] = useState('customer'); // 'customer', 'admin'
@@ -17,87 +19,65 @@ const CustomerDashboard = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
+  const loadData = async () => {
     setLoading(true);
     
-    // Get user role for filtering
-    // eslint-disable-next-line no-unused-vars
-    const storedRole = localStorage.getItem('userRole') || 'customer';
-    
-    // Mock orders data
-    const mockOrders = [
-      {
-        _id: '1',
-        orderNumber: 'ORD-2025-001',
-        createdAt: '2025-11-01',
-        status: 'in_production',
-        items: [{ name: 'Oak Chair', quantity: 2, image: '/images/chair/image-3.jfif' }],
-        totalAmount: 500,
-        carpenter: 'Michael Johnson',
-      },
-      {
-        _id: '2',
-        orderNumber: 'ORD-2025-002',
-        createdAt: '2025-11-05',
-        status: 'delivered',
-        items: [{ name: 'Dining Table', quantity: 1, image: '/images/table/image-1.jfif' }],
-        totalAmount: 850,
-        carpenter: 'Sarah Williams',
-      },
-      {
-        _id: '3',
-        orderNumber: 'ORD-2025-003',
-        createdAt: '2025-11-10',
-        status: 'pending',
-        items: [{ name: 'Queen Bed', quantity: 1, image: '/images/bed/image-4.jfif' }],
-        totalAmount: 1200,
-        carpenter: 'David Brown',
-      },
-      {
-        _id: '4',
-        orderNumber: 'ORD-2025-004',
-        createdAt: '2025-11-12',
-        status: 'confirmed',
-        items: [
-          { name: 'Wooden Cupboard', quantity: 1, image: '/images/cupboard/image-3.avif' },
-          { name: 'Side Table', quantity: 2, image: '/images/table/image-2.jfif' }
-        ],
-        totalAmount: 950,
-        carpenter: 'Michael Johnson',
-      },
-    ];
-
-    // Mock customers data (for admin)
-    const mockCustomers = [
-      {
-        id: 1,
-        name: 'John Smith',
-        email: 'john.smith@example.com',
-        phone: '+1-555-0201',
-        address: '123 Oak Street, Springfield, IL 62701',
-        joinedDate: '2025-01-15',
-        totalOrders: 5,
-        totalSpent: 2500,
-        status: 'active',
-      },
-      {
-        id: 2,
-        name: 'Emily Davis',
-        email: 'emily.davis@example.com',
-        phone: '+1-555-0202',
-        address: '456 Pine Avenue, Madison, WI 53703',
-        joinedDate: '2025-02-20',
-        totalOrders: 3,
-        totalSpent: 1800,
-        status: 'active',
-      },
-    ];
-
-    setTimeout(() => {
-      setOrders(mockOrders);
+    try {
+      // Fetch orders from API - backend filters by logged-in user
+      const response = await ordersAPI.getAll();
+      const ordersData = response.data;
+      
+      // Transform orders data for display
+      const transformedOrders = ordersData.map(order => ({
+        _id: order._id,
+        orderNumber: order.orderNumber || `ORD-${order._id.slice(-6).toUpperCase()}`,
+        createdAt: order.createdAt,
+        status: order.status,
+        items: order.items.map(item => ({
+          name: item.furniture?.name || 'Unknown Item',
+          quantity: item.quantity,
+          image: item.furniture?.images?.[0] || '/images/placeholder.jpg',
+          price: item.price
+        })),
+        totalAmount: order.totalAmount,
+        carpenter: order.items[0]?.carpenter?.name || 'Not Assigned',
+      }));
+      
+      setOrders(transformedOrders);
+      
+      // Mock customers data (for admin)
+      const mockCustomers = [
+        {
+          id: 1,
+          name: 'John Smith',
+          email: 'john.smith@example.com',
+          phone: '+1-555-0201',
+          address: '123 Oak Street, Springfield, IL 62701',
+          joinedDate: '2025-01-15',
+          totalOrders: 5,
+          totalSpent: 2500,
+          status: 'active',
+        },
+        {
+          id: 2,
+          name: 'Emily Davis',
+          email: 'emily.davis@example.com',
+          phone: '+1-555-0202',
+          address: '456 Pine Avenue, Madison, WI 53703',
+          joinedDate: '2025-02-20',
+          totalOrders: 3,
+          totalSpent: 1800,
+          status: 'active',
+        },
+      ];
+      
       setCustomers(mockCustomers);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      setOrders([]);
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   const getStatusColor = (status) => {
